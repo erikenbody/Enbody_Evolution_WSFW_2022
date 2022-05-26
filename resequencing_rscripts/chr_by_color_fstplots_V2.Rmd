@@ -1,0 +1,224 @@
+---
+title: "chr_by_color_fstplots"
+author: "Erik Enbody"
+date: "7/19/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(methods)
+library(optparse)
+library(qqman)
+library(stringr)
+library(cowplot)
+library(reshape2)
+library(rtracklayer)
+library(data.table)
+library(ggrepel)
+#bioclite install
+#library(ensembldb)
+#library(EnsDb.Hsapiens.v79)
+#library(EnsDb.Hsapiens.v86)
+library(tidyverse)
+```
+
+
+```{r source_helper_scripts}
+#rm(list=ls())
+
+source("annotation_import.r")
+
+source("fst_functions.R")
+
+```
+
+```{r blackchest}
+bc.f<-read.table("data/by_color/blackchest_whitechest_autosome_nocov_NR_bycolor_50000_OL-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+bc.z<- read.table("data/by_color/blackchest_whitechest_zchr_nocov_NR_bycolor_50000_OL-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+
+#to check non overlapping windows
+#bc.f<-read.table("data/by_color/blackchest_whitechest_autosome_nocov_NR_bycolor_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+
+
+#bc.f<-read.table("data/by_color/blackchest_whitechest_autosome_nocov_NR_bycolor_25000_OL-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+#25kb windows dont really look diff
+
+
+#head(bc.f)
+#                                          V1         V2    V3    V4       V5
+#1     (4563,54548)(10000,59999)(10000,60000) scaffold_0 35000 49987 0.097094
+#2    (14563,64543)(20000,69999)(20000,70000) scaffold_0 45000 49982 0.107077
+#3    (24558,74489)(30000,79999)(30000,80000) scaffold_0 55000 49933 0.105237
+#4    (34552,84475)(40000,89999)(40000,90000) scaffold_0 65000 49925 0.103969
+#5   (44549,94474)(50000,99999)(50000,100000) scaffold_0 75000 49927 0.113743
+#6 (54549,104473)(60000,109999)(60000,110000) scaffold_0 85000 49926 0.109120
+#
+bc_fst<-input_fst(bc.f,bc.z)
+plot.bc_fst <- manc(bc_fst)
+
+plot.bc_fst.l <- manc.labels(bc_fst, "output/chest_genes_of_interest.csv") + ylim(0, 0.8)
+
+pdf("output/chr_bycolor/chrom_blackchest_bycolor_custom.pdf",height=3,width=16)
+plot.bc_fst
+dev.off()
+
+plot.bc_fst
+ggsave("output/chr_bycolor/chrom_blackchest_bycolor_custom.png", height = 3, width = 16)
+dev.off()
+
+pdf("output/chr_bycolor/chrom_blackchest_bycolor_custom_LABELS.pdf",height=3,width=16)
+plot.bc_fst.l
+dev.off()
+
+```
+
+
+```{r whitechest}
+sp.f<-read.table("data/by_color/whitesp_lorentzi_autosome_nocov_NR_bycolor_50000_OL-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+sp.z<- read.table("data/by_color/whitesp_lorentzi_zchr_nocov_NR_bycolor_50000_OL-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+
+sp_fst<-input_fst(sp.f,sp.z)
+plot.sp_fst <- manc(sp_fst)
+
+plot.sp_fst.l <- manc.labels(sp_fst, "output/sp_genes_of_interest.csv")
+
+pdf("output/chr_bycolor/chrom_whitesp_bycolor_custom_LABELS.pdf",height=3,width=16)
+plot.sp_fst.l
+dev.off()
+
+pdf("output/chr_bycolor/chrom_whitesp_bycolor_custom.pdf",height=3,width=16)
+plot.sp_fst
+dev.off()
+
+```
+
+```{r null}
+
+#THE Z CHR ISNT THE RIGHT DATA. Using as a filler
+ai_mo_lf<-read.table("data/pub_ready/angsd_output_lowfilt/aida_moretoni_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zna_mo <- read.table("data/pub_ready/angsd_output_lowfilt/aida_moretoni_zchr_low_filter_NR_OL_50000-Win.fst.txt",header=FALSE,row.names=NULL,skip=1)
+
+null_fst<-input_fst(ai_mo_lf,zna_mo)
+plot.sp_fst <- manc(null_fst)
+plot.sp_fst
+```
+
+```{r chr_1A}
+
+plotA <- filt_manc(bc_fst, "chromosome_1A")
+plotB <- filt_manc(sp_fst, "chromosome_1A")
+
+pdf("output/chr_bycolor/chrom_1A_compare.pdf",height=5,width=6)
+plot_grid(plotA, plotB, ncol = 1, nrow = 2)
+dev.off()
+```
+
+```{r plot_all_peaks}
+
+#set thresholds
+auto_bc_fst <- bc_fst %>% filter(chr != "chromosome_Z")
+Z_bc_fst <- bc_fst %>% filter(chr == "chromosome_Z")
+auto_sp_fst <- sp_fst %>% filter(chr != "chromosome_Z")
+Z_sp_fst <- sp_fst %>% filter(chr == "chromosome_Z")
+bc_thresh_A <- quantile(auto_bc_fst$fst,.999,na.rm=T)[[1]]
+sp_thresh_A <- quantile(auto_sp_fst$fst,.999,na.rm=T)[[1]]
+bc_thresh_Z <- quantile(Z_bc_fst$fst,.999,na.rm=T)[[1]]
+sp_thresh_Z <- quantile(Z_sp_fst$fst,.999,na.rm=T)[[1]]
+
+ol_bc_auto <- auto_bc_fst %>% filter(fst > bc_thresh_A) %>% distinct(scaff)
+ol_sp_auto <- auto_sp_fst %>% filter(fst > sp_thresh_A) %>% distinct(scaff)
+
+ol_bc_Z <- Z_bc_fst %>% filter(fst > bc_thresh_Z) %>% distinct(scaff)
+ol_sp_Z <- Z_sp_fst %>% filter(fst > sp_thresh_Z) %>% distinct(scaff)
+
+plot_list <- list()
+multi_plot <- function(x){
+  gene.subset <- gene.ranges %>% filter(seqid == x)
+  ggplot() + 
+  geom_point(data = subset(bc_fst, scaff == x), 
+             aes(x=midPos,y=fst, colour="chest"), color = "#5ab4ac", alpha = 0.5, size = 4) +
+  geom_point(data = subset(sp_fst, scaff == x), 
+             aes(x=midPos,y=fst, colour="chest"), color = "#d8b365", alpha = 0.5, size = 4) +
+  geom_hline(yintercept = bc_thresh_A, color = "#5ab4ac") +
+  geom_hline(yintercept = sp_thresh_A, color = "#d8b365") +
+  theme_classic() + theme(legend.position = "none", text = element_text(size=20)) +
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1),minor_breaks = NULL) +
+  geom_segment(data = gene.subset, aes(x = start, y = 0.8, xend = end, yend = 0.8)) +
+  geom_label_repel(data = gene.subset, aes(x = start, y = 0.85, label = blast_name)) +
+  xlab(x)
+}
+
+pdf("output/by_color_outlier_scaffolds/SP_combined_Fst_outlier_lots.pdf", width=20,height=10,useDingbats = FALSE)
+for (x in ol_sp_auto$scaff){
+  p <- multi_plot(x)
+  plot_list[[x]] = p
+  print(plot_list[[x]])
+}
+dev.off()
+
+pdf("output/by_color_outlier_scaffolds/Chest_combined_Fst_outlier_lots.pdf", width=20,height=10,useDingbats = FALSE)
+for (x in ol_bc_auto$scaff){
+  p <- multi_plot(x)
+  plot_list[[x]] = p
+  print(plot_list[[x]])
+}
+dev.off()
+
+#Z Chrom
+
+pdf("output/by_color_outlier_scaffolds/SP_Z_combined_Fst_outlier_lots.pdf", width=20,height=10,useDingbats = FALSE)
+for (x in ol_sp_Z$scaff){
+  p <- multi_plot(x)
+  plot_list[[x]] = p
+  print(plot_list[[x]])
+}
+dev.off()
+
+pdf("output/by_color_outlier_scaffolds/Chest_Z_combined_Fst_outlier_lots.pdf", width=20,height=10,useDingbats = FALSE)
+for (x in ol_bc_Z$scaff){
+  p <- multi_plot(x)
+  plot_list[[x]] = p
+  print(plot_list[[x]])
+}
+dev.off()
+
+```
+
+```{r how_many_peaks}
+#chest
+
+peaks_bc_auto <- auto_bc_fst %>% filter(fst > bc_thresh_A) 
+peaks_bc_Z <- Z_bc_fst %>% filter(fst > bc_thresh_Z) 
+peaks_bc <- rbind(peaks_bc_auto, peaks_bc_Z)
+
+
+range.peaks_bc <- GRanges(peaks_bc$scaff, as.numeric(peaks_bc$midPos))
+
+reduce.range.peaks_bc <- GenomicRanges::reduce(range.peaks_bc, min.gapwidth = 100000)
+
+f.peaks_bc <- as.data.frame(reduce.range.peaks_bc)
+f.peaks_bc %>% filter(width > 1) %>% nrow()
+f.peaks_bc %>% filter(width > 1) %>% write_csv("output/bc_outlier_peaks.csv")
+#SP
+
+peaks_sp_auto <- auto_sp_fst %>% filter(fst > sp_thresh_A) 
+peaks_sp_Z <- Z_sp_fst %>% filter(fst > sp_thresh_Z) 
+peaks_sp <- rbind(peaks_sp_auto, peaks_sp_Z)
+
+range.peaks_sp <- GRanges(peaks_sp$scaff, peaks_sp$midPos)
+
+reduce.range.peaks_sp <- GenomicRanges::reduce(range.peaks_sp, min.gapwidth = 100000)
+
+f.peaks_sp <- as.data.frame(reduce.range.peaks_sp)
+f.peaks_sp %>% filter(width > 1) %>% nrow()
+
+f.peaks_sp %>% filter(width > 1) %>% write_csv("output/sp_outlier_peaks.csv")
+
+```

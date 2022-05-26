@@ -1,0 +1,31 @@
+Rscript scripts4command_line/run_DESEQ2.R -t "AllParts" -c "White" -d "Black"
+Rscript scripts4command_line/run_DESEQ2.R -t "AllParts" -c "White" -d "Brown"
+Rscript scripts4command_line/run_DESEQ2.R -t "AllParts" -c "Brown" -d "Black" 
+Rscript scripts4command_line/run_DESEQ2.R -t "Chest" -c "White" -d "Black" 
+Rscript scripts4command_line/run_DESEQ2.R -t "SP" -c "White" -d "Brown"
+Rscript scripts4command_line/run_DESEQ2.R -t "Crown" -c "Black" -d "Brown"
+
+Rscript scripts4command_line/run_DESEQ2.R -t "Chest" -c "White" -d "Black" -p "aida" -q "naimii"
+Rscript scripts4command_line/run_DESEQ2.R -t "Chest" -c "White" -d "Black" -p "aida" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2.R -t "Chest" -c "White" -d "Black" -p "moretoni" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2.R -t "SP" -c "White" -d "Brown" -p "moretoni" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2.R -t "SP" -c "White" -d "Brown" -p "aida" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2.R -t "SP" -c "White" -d "Brown" -p "naimii" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2.R -t "SP" -c "White" -d "Brown" -p "lorentzi" -q "lorentzi"
+
+#FDR = 0.05
+
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "AllParts" -c "White" -d "Black"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "AllParts" -c "White" -d "Brown"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "AllParts" -c "Brown" -d "Black" 
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "Chest" -c "White" -d "Black" 
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "SP" -c "White" -d "Brown" 
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "Crown" -c "Black" -d "Brown"
+
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "Chest" -c "White" -d "Black" -p "aida" -q "naimii"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "Chest" -c "White" -d "Black" -p "aida" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "Chest" -c "White" -d "Black" -p "moretoni" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "SP" -c "White" -d "Brown" -p "moretoni" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "SP" -c "White" -d "Brown" -p "aida" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "SP" -c "White" -d "Brown" -p "naimii" -q "lorentzi"
+Rscript scripts4command_line/run_DESEQ2_fdr_0.05.R -t "SP" -c "White" -d "Brown" -p "lorentzi" -q "lorentzi"

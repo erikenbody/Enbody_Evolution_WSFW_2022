@@ -1,0 +1,438 @@
+---
+title: "chr_by_color_fstplots"
+author: "Erik Enbody"
+date: "7/19/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(methods)
+library(optparse)
+library(ggplot2)
+library(qqman)
+library(dplyr)
+library(stringr)
+library(cowplot)
+library(tidyr)
+library(reshape2)
+#library(rtracklayer)
+library(data.table)
+library(ggrepel)
+library(tidyverse)
+#bioclite install
+#library(ensembldb)
+#library(EnsDb.Hsapiens.v79)
+#library(EnsDb.Hsapiens.v86)
+```
+
+
+```{r source_helper_scripts}
+rm(list=ls())
+
+source("annotation_import.r")#this isnt used here
+
+
+
+###HOW I MADE THE CHAIN FILE INPUT###
+###loading seperately to speed
+
+#wsfw.zefi.chain <- fread("data/satsuma_chain_file/satsuma_summary.chained.out")
+#names(wsfw.zefi.chain) <- c("wsfw_scaff", "wsfw_start", "wsfw_end", "zefi_chr", "zefi_start", "zefi_end", "V7", "V8")
+#
+#wsfw.zefi.chain2 <- wsfw.zefi.chain %>% separate(zefi_chr, c("A","B","C","D","E", "F", "G", "H"), remove = FALSE) %>% 
+#  select(-A,-B,-C,-D,-E,-F) %>% 
+#  mutate(chr = paste(G, H, sep = "_")) %>% 
+#  select(-G, -H)
+#fwrite(wsfw.zefi.chain2, "data/satsuma_chain_file/FORMATTED_satsuma_summary.chained.out")
+wsfw.zefi.chain <- fread("data/satsuma_chain_file/FORMATTED_satsuma_summary.chained.out")
+gr1 <- GRanges(wsfw.zefi.chain$wsfw_scaff, IRanges(wsfw.zefi.chain$wsfw_start, wsfw.zefi.chain$wsfw_end), zefi = wsfw.zefi.chain$chr, zefi_start = wsfw.zefi.chain$zefi_start, zefi_end = wsfw.zefi.chain$zefi_end)
+
+
+#head(wsfw.zefi.chain)
+#wsfw_scaff wsfw_start wsfw_end
+#1: scaffold_0    2435534  2435559
+#2: scaffold_0    2435829  2435856
+#3: scaffold_0    2436305  2436336
+#4: scaffold_0    2436347  2436373
+#5: scaffold_0    2436379  2436409
+#6: scaffold_0    2436547  2436574
+#                                                                                     zefi_chr
+#1: CM012084.1_Taeniopygia_guttata_isolate_Black17_chromosome_3,_whole_genome_shotgun_sequence
+#2: CM012084.1_Taeniopygia_guttata_isolate_Black17_chromosome_3,_whole_genome_shotgun_sequence
+#3: CM012084.1_Taeniopygia_guttata_isolate_Black17_chromosome_3,_whole_genome_shotgun_sequence
+#4: CM012084.1_Taeniopygia_guttata_isolate_Black17_chromosome_3,_whole_genome_shotgun_sequence
+#5: CM012084.1_Taeniopygia_guttata_isolate_Black17_chromosome_3,_whole_genome_shotgun_sequence
+#6: CM012084.1_Taeniopygia_guttata_isolate_Black17_chromosome_3,_whole_genome_shotgun_sequence
+#   zefi_start zefi_end V7 V8          chr
+#1:   82987547 82987572  1  + chromosome_3
+#2:   82987841 82987868  1  + chromosome_3
+#3:   82988374 82988405  1  + chromosome_3
+#4:   82988416 82988442  1  + chromosome_3
+#5:   82988448 82988478  1  + chromosome_3
+#6:   82988615 82988642  1  + chromosome_3
+```
+
+```{r func_input_sw_withzchr}
+input_SW2<-function(x,y){
+pops<-x
+zpops<-y
+  
+##ZCHROM
+#colnames(zpops)<-c("region","scaff","midPos","Nsites","fst")
+#sl50<-read.table("data/autosome_scaffolds_gr_50000.txt",header=TRUE)
+#zpops<-merge(zpops,sl50,all.x=FALSE,all.y=FALSE,by="scaff")
+#out<-strsplit(as.character(zpops$scaff), "_")
+#zpops$scaff_num<-as.numeric(lapply(out,function(ss){ss[2]}))
+#
+#zpops<-zpops[as.numeric(ave(zpops$scaff_num, zpops$scaff_num, FUN=length)) >= 2, ]
+#zpops<-dplyr::filter(zpops, Nsites>10)
+#
+#zpops.subset<-zpops[complete.cases(zpops),]
+#SNP<-c(1:(nrow(zpops.subset)))
+#zpops_df<-data.frame(SNP,zpops.subset)
+#
+######CALCULATE ZFST####
+##on filtered dataset
+##following Fan et al. 2017 Genome Biology
+#zpops_df$zfst<-(zpops_df$fst - mean(zpops_df$fst))/sd(zpops_df$fst)
+
+#AUTOSOMES
+
+colnames(pops)<-c("midPos","CLR","alpha", "scaff")
+sl50<-read.table("data/autosome_scaffolds_gr_50000.txt",header=TRUE)
+pops<-merge(pops,sl50,all.x=FALSE,all.y=FALSE,by="scaff")
+out<-strsplit(as.character(pops$scaff), "_")
+pops$scaff_num<-as.numeric(lapply(out,function(ss){ss[2]}))
+
+pops<-pops[as.numeric(ave(pops$scaff_num, pops$scaff_num, FUN=length)) >= 2, ]
+
+pops.subset<-pops[complete.cases(pops),]
+SNP<-c(1:(nrow(pops.subset)))
+pops_df<-data.frame(SNP,pops.subset)
+###MERGE Z and AUTO
+#pops_comb<-rbind(pops_df,zpops_df)
+pops_comb<-pops_df
+
+#OVERLAP WITH ZEFI CHROMOSOME COORDINATES
+
+gr2 <- GRanges(pops_comb$scaff, ranges = IRanges(pops_comb$midPos, width = 1))
+
+fo <- suppressWarnings(findOverlaps(gr1, gr2, maxgap = 650))
+overlap <- cbind(wsfw.zefi.chain[queryHits(fo), ], pops_comb[subjectHits(fo), ])
+
+overlap_srt <- overlap %>% arrange(chr, zefi_start)
+
+#overlap_srt %>% mutate(combo = paste(V2, V3, sep = "_")) %>% 
+#  group_by(combo) %>% 
+#  filter(n()>1) %>% View()
+
+overlap_srt2 <- overlap_srt %>% mutate(combo = paste(scaff, midPos, sep = "_")) %>% 
+  distinct(combo, .keep_all = TRUE) %>%
+  select(-combo) 
+
+chr_pops_comb <- overlap_srt2 %>% select(SNP, scaff, midPos, CLR, alpha, scaff_num, chr, zefi_start) #%>% dplyr::rename(V2 = chr)
+
+return(chr_pops_comb)
+
+}
+```
+
+```{r func_custom_manplot}
+manc<-function(fst){
+
+fst$chr <- ifelse(!grepl("chromosome",fst$chr), "chromosome_unknown", fst$chr)
+
+#specific to the vertebrate genomes unpublished ZEFI assembly
+chr_order <- c("chromosome_1", "chromosome_1A", "chromosome_2", "chromosome_3", "chromosome_4", "chromosome_4A", "chromosome_5", "chromosome_6", "chromosome_7", "chromosome_8", "chromosome_9", "chromosome_10", "chromosome_11", "chromosome_12", "chromosome_13", "chromosome_14", "chromosome_15", "chromosome_16", "chromosome_17", "chromosome_18", "chromosome_19", "chromosome_20", "chromosome_21", "chromosome_22", "chromosome_23", "chromosome_24", "chromosome_25", "chromosome_26", "chromosome_27", "chromosome_28", "chromosome_29", "chromosome_30", "chromosome_Z", "chromosome_unknown")
+
+fst$chr_ordered <- factor(fst$chr, levels = chr_order)
+
+fst<-fst%>%arrange(chr_ordered, zefi_start)
+fst$row<-1:nrow(fst)
+
+fst$CLRrollmean <- zoo::rollmean(fst$CLR,50,fill=NA)
+
+fst$chr_labels <- gsub("chromosome_", "", fst$chr_ordered)
+chr_breaks <- fst %>% group_by(chr_labels) %>% dplyr::summarise(chr_breaks = mean(row))
+
+olf<-filter(fst,chr!="chromosome_Z")
+olf2<-filter(olf,CLR>=quantile(CLR,.99,na.rm=T))
+olf3<-filter(olf,CLR>=quantile(CLR,.999,na.rm=T))
+
+olz<-filter(fst,chr=="chromosome_Z")
+olz2<-filter(olz,CLR>=quantile(CLR,.99,na.rm=T))
+olz3<-filter(olz,CLR>=quantile(CLR,.999,na.rm=T))
+
+#FST
+fst_main <- fst %>% 
+  ggplot(aes(x=row,y=CLR,col=chr_ordered))+theme_bw()+
+  theme(legend.position="none",
+        panel.border=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 45, color = "black"),
+        panel.grid = element_blank(),
+        panel.grid.major.y=element_line(color="grey60",size=0.2),
+        panel.grid.minor.y=element_line(color="grey60",size=0.1),
+        axis.title.y = element_text(size=12),
+        axis.text = element_text(size=7),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_line(size=0.2)) +
+  scale_color_manual(values=rep(c("grey30","grey80"),length(levels(factor(fst$chr_ordered)))/2+1))+
+  geom_point(size=0.4,shape=21,stroke=0.2)+
+  geom_line(aes(y=CLRrollmean),lwd=0.15,col="black") +
+  labs(y="CLR") +
+  scale_x_continuous(breaks=chr_breaks$chr_breaks, 
+       labels = chr_breaks$chr_labels)
+
+fst_out <- fst_main +
+  #geom_point(data=olf2,shape=21,stroke=0.4,size=0.5,col="orange")+
+  #geom_point(data=olz2,shape=21,stroke=0.4,size=0.5,col="orange")+
+  geom_point(data=olf3,shape=21,stroke=0.4,size=0.5,col="red")+
+  geom_point(data=olz3,shape=21,stroke=0.4,size=0.5,col="red")
+  
+
+return(fst_out)
+}
+```
+
+```{r func_custom_manplot}
+manc.labels<-function(fst, genes){
+
+fst$chr <- ifelse(!grepl("chromosome",fst$chr), "chromosome_unknown", fst$chr)
+
+#specific to the vertebrate genomes unpublished ZEFI assembly
+chr_order <- c("chromosome_1", "chromosome_1A", "chromosome_2", "chromosome_3", "chromosome_4", "chromosome_4A", "chromosome_5", "chromosome_6", "chromosome_7", "chromosome_8", "chromosome_9", "chromosome_10", "chromosome_11", "chromosome_12", "chromosome_13", "chromosome_14", "chromosome_15", "chromosome_16", "chromosome_17", "chromosome_18", "chromosome_19", "chromosome_20", "chromosome_21", "chromosome_22", "chromosome_23", "chromosome_24", "chromosome_25", "chromosome_26", "chromosome_27", "chromosome_28", "chromosome_29", "chromosome_30", "chromosome_Z", "chromosome_unknown")
+
+fst$chr_ordered <- factor(fst$chr, levels = chr_order)
+
+fst<-fst%>%arrange(chr_ordered, zefi_start)
+fst$row<-1:nrow(fst)
+fst$fstrollmean <- zoo::rollmean(fst$fst,50,fill=NA)
+
+fst$chr_labels <- gsub("chromosome_", "", fst$chr_ordered)
+chr_breaks <- fst %>% group_by(chr_labels) %>% dplyr::summarise(chr_breaks = mean(row))
+
+olf<-filter(fst,chr!="chromosome_Z")
+olf2<-filter(olf,fst>=quantile(fst,.99,na.rm=T))
+olf3<-filter(olf,fst>=quantile(fst,.999,na.rm=T))
+
+olz<-filter(fst,chr=="chromosome_Z")
+olz2<-filter(olz,fst>=quantile(fst,.99,na.rm=T))
+olz3<-filter(olz,fst>=quantile(fst,.999,na.rm=T))
+
+genes.interest <- read.csv(genes, header = TRUE)
+
+gr1.x <- GRanges(genes.interest$chr, ranges = IRanges(genes.interest$zefi_start, width = 1))
+gr2.x <- GRanges(fst$chr, ranges = IRanges(fst$zefi_start, width = 1))
+
+fo <- suppressWarnings(findOverlaps(gr1.x, gr2.x, maxgap = 50000))
+
+genes.fst <- cbind(genes.interest[queryHits(fo), ], fst[subjectHits(fo), c("row", "fst")])
+genes.fst <- genes.fst %>% select(chr, blast_name, Name, row, fst) %>% 
+  group_by(Name) %>% filter(fst == max(fst))
+  
+
+#FST
+fst_main <- fst %>% 
+  ggplot(aes(x=row,y=fst,col=chr_ordered))+theme_bw()+
+  theme(legend.position="none",
+        panel.border=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 45, color = "black"),
+        panel.grid = element_blank(),
+        panel.grid.major.y=element_line(color="grey60",size=0.2),
+        panel.grid.minor.y=element_line(color="grey60",size=0.1),
+        axis.title.y = element_text(size=12),
+        axis.text = element_text(size=7),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_line(size=0.2)) +
+  scale_color_manual(values=rep(c("grey30","grey80"),length(levels(factor(fst$chr_ordered)))/2+1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1),minor_breaks = NULL)+
+  #geom_point(size=0.4,shape=21,stroke=0.2)+
+  #geom_line(aes(y=fstrollmean),lwd=0.15,col="black") +
+  labs(y=expression(F[st])) +
+  scale_x_continuous(breaks=chr_breaks$chr_breaks, 
+       labels = chr_breaks$chr_labels) +
+  geom_text_repel(data = genes.fst, aes(x = row, y = fst, label = blast_name), color = "black", nudge_y = 0.05) 
+  theme(axis.line=element_blank(),axis.text.x=element_blank(),
+          axis.text.y=element_blank(),axis.ticks=element_blank(),
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank(),legend.position="none",
+          panel.background=element_blank(),panel.border=element_blank(),panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank(),plot.background=element_blank())
+return(fst_main)
+}
+```
+
+```{r manc_filter_chromosome}
+
+filt_manc<-function(fst, chr_idx){
+
+fst <- fst %>% filter(chr == chr_idx)
+  
+fst$chr <- ifelse(!grepl("chromosome",fst$chr), "chromosome_unknown", fst$chr)
+
+#specific to the vertebrate genomes unpublished ZEFI assembly
+chr_order <- c("chromosome_1", "chromosome_1A", "chromosome_2", "chromosome_3", "chromosome_4", "chromosome_4A", "chromosome_5", "chromosome_6", "chromosome_7", "chromosome_8", "chromosome_9", "chromosome_10", "chromosome_11", "chromosome_12", "chromosome_13", "chromosome_14", "chromosome_15", "chromosome_16", "chromosome_17", "chromosome_18", "chromosome_19", "chromosome_20", "chromosome_21", "chromosome_22", "chromosome_23", "chromosome_24", "chromosome_25", "chromosome_26", "chromosome_27", "chromosome_28", "chromosome_29", "chromosome_30", "chromosome_Z", "chromosome_unknown")
+
+fst$chr_ordered <- factor(fst$chr, levels = chr_order)
+
+fst<-fst%>%arrange(chr_ordered, zefi_start)
+fst$row<-1:nrow(fst)
+fst$fstrollmean <- zoo::rollmean(fst$fst,50,fill=NA)
+
+fst$chr_labels <- gsub("chromosome_", "", fst$chr_ordered)
+chr_breaks <- fst %>% group_by(chr_labels) %>% dplyr::summarise(chr_breaks = mean(row))
+
+olf<-filter(fst,chr!="chromosome_Z")
+olf2<-filter(olf,fst>=quantile(fst,.99,na.rm=T))
+olf3<-filter(olf,fst>=quantile(fst,.999,na.rm=T))
+
+olz<-filter(fst,chr=="chromosome_Z")
+olz2<-filter(olz,fst>=quantile(fst,.99,na.rm=T))
+olz3<-filter(olz,fst>=quantile(fst,.999,na.rm=T))
+
+#FST
+fst_main <- fst %>% 
+  ggplot(aes(x=row,y=fst,col=chr_ordered))+theme_bw()+
+  theme(legend.position="none",
+        panel.border=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 45, color = "black"),
+        panel.grid = element_blank(),
+        panel.grid.major.y=element_line(color="grey60",size=0.2),
+        panel.grid.minor.y=element_line(color="grey60",size=0.1),
+        axis.title.y = element_text(size=12),
+        axis.text = element_text(size=7),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_line(size=0.2)) +
+  scale_color_manual(values=rep(c("grey30","grey80"),length(levels(factor(fst$chr_ordered)))/2+1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1),minor_breaks = NULL)+
+  geom_point(size=0.4,shape=21,stroke=0.2)+
+  geom_line(aes(y=fstrollmean),lwd=0.15,col="black") +
+  labs(y=expression(F[st])) +
+  scale_x_continuous(breaks=chr_breaks$chr_breaks, 
+       labels = chr_breaks$chr_labels)
+
+fst_out <- fst_main +
+  geom_point(data=olf2,shape=21,stroke=0.4,size=0.5,col="orange")+
+  geom_point(data=olz2,shape=21,stroke=0.4,size=0.5,col="orange")+
+  geom_point(data=olf3,shape=21,stroke=0.4,size=0.5,col="red")+
+  geom_point(data=olz3,shape=21,stroke=0.4,size=0.5,col="red")
+
+return(fst_out)
+}
+
+```
+
+```{r aida}
+
+aida.sw <- read.table("data/sweepfinder/aida_g5000.sf2.concat", header = T)
+
+aida_sw <- input_SW2(aida.sw, NA)
+
+plot_aida_sw <- manc(aida_sw)
+
+pdf("output/sweepfinder/aida_man.pdf",height=3,width=16)
+plot_aida_sw
+dev.off()
+
+
+
+
+
+#plot.bc_fst.l <- manc.labels(bc_fst, "output/chest_genes_of_interest.csv")
+
+```
+
+```{r naimii}
+
+naimii.sw <- read.table("data/sweepfinder/naimii_g5000.sf2.concat", header = T)
+
+naimii_sw <- input_SW2(naimii.sw, NA)
+
+plot_naimii_sw <- manc(naimii_sw)
+
+pdf("output/sweepfinder/naimii_man.pdf",height=3,width=16)
+plot_naimii_sw
+dev.off()
+
+
+
+
+
+#plot.bc_fst.l <- manc.labels(bc_fst, "output/chest_genes_of_interest.csv")
+
+```
+
+```{r moretoni}
+
+moretoni.sw <- read.table("data/sweepfinder/moretoni_g5000.sf2.concat", header = T)
+
+moretoni_sw <- input_SW2(moretoni.sw, NA)
+
+plot_moretoni_sw <- manc(moretoni_sw)
+
+pdf("output/sweepfinder/moretoni_man.pdf",height=3,width=16)
+plot_moretoni_sw
+dev.off()
+
+
+
+
+
+#plot.bc_fst.l <- manc.labels(bc_fst, "output/chest_genes_of_interest.csv")
+
+```
+
+```{r lorentzi}
+
+lorentzi.sw <- read.table("data/sweepfinder/lorentzi_g5000.sf2.concat", header = T)
+
+lorentzi_sw <- input_SW2(lorentzi.sw, NA)
+
+plot_lorentzi_sw <- manc(lorentzi_sw)
+
+pdf("output/sweepfinder/lorentzi_man.pdf",height=3,width=16)
+plot_lorentzi_sw
+dev.off()
+
+
+
+
+
+#plot.bc_fst.l <- manc.labels(bc_fst, "output/chest_genes_of_interest.csv")
+
+```
+
+
+```{r combine}
+moretoni_sw$pop <- "moretoni"
+aida_sw$pop <- "aida"
+lorentzi_sw$pop <- "lorentzi"
+naimii_sw$pop <- "naimii"
+
+comb_sw <- rbind(moretoni_sw, aida_sw, lorentzi_sw, naimii_sw)
+
+comb_sw.w <- comb_sw %>% 
+  select(-alpha, -SNP) %>% 
+  pivot_wider(values_from = "CLR", names_from = "pop")
+
+
+
+comb_sw.w %>% filter(moretoni > quantile(comb_sw.w$moretoni, 0.99, na.rm = T),
+                     aida > quantile(comb_sw.w$aida, 0.99, na.rm = T),
+                     lorentzi < quantile(comb_sw.w$lorentzi, 0.99, na.rm = T)) %>% View()
+
+```

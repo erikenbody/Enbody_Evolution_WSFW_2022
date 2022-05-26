@@ -1,0 +1,299 @@
+---
+title: "combined_plot.Rmd"
+author: "Erik Enbody"
+date: "8/13/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("tidyverse")
+library(patchwork)
+```
+
+```{r importdata}
+
+source("annotation_import.r")
+source("fst_functions.R")
+
+#load("output/makebigdataframe/fst_out.rda")
+load("output/custom_pbs/zfst_output_V2.rda")
+load("output/makebigdataframe/dxy_out.rda")
+load("output/makebigdataframe/thetas_out_V2.0.rda")
+load("output/custom_pbs/pbs_output_V2.rda")
+
+statsdf<-rbind(all.pops.zfst.out,dxy_out,thetas_outV2,all.pops.PBS)
+#re order factors for proper plotting
+statsdf$stat<-as.factor(statsdf$stat)
+statsdf$pop<-as.factor(statsdf$pop)
+
+statsdf$stat <- factor(statsdf$stat,levels=c("ZF[ST]", "fayh", "D[xy]","PBS","TajimasD","pi"))
+
+#add custom columns specific to plotting
+statsdf <-statsdf %>% mutate(linetype = ifelse(pop %in% c("aida","naimii","lorentzi","moretoni"), as.character(pop), "comp"))
+statsdf <-statsdf %>% mutate(color = ifelse(pop %in% c("ai_lo","ai_mo","ai_na","na_lo","na_mo","lo_mo"), as.character(pop), "single"))
+
+sp.peaks <- read.csv("output/sp_outlier_peaks.csv")
+chest.peaks <- read.csv("output/bc_outlier_peaks.csv")
+
+sp.peaks <- sp.peaks %>% mutate(start_buffer = start - 10000,
+                    end_buffer = end + 10000)
+
+chest.peaks <- chest.peaks %>% mutate(start_buffer = start - 1000000,
+                                      end_buffer = end + 1000000,
+                                      peak = 1:nrow(chest.peaks))
+
+#do chest peaks only for now
+pull.thetas.peaks <- function(peak.file){
+  df.peak.tmp <- peak.file %>% filter(seqnames %in% statsdf$scaff)
+  datalist <- list()
+  for (i in 1:nrow(df.peak.tmp)){
+    df.peak <- df.peak.tmp[i,]
+    df.tmp <- statsdf %>% filter(scaff %in% df.peak$seqnames)
+    df.tmp <- df.tmp %>% filter(midPos > df.peak$start_buffer & midPos < df.peak$end_buffer) %>% 
+      mutate(peak = i)
+    datalist[[i]] <- df.tmp
+  }
+  thetas.peaks = do.call(rbind, datalist) 
+  thetas.peaks
+}
+
+thetas.chest.peaks <- pull.thetas.peaks(chest.peaks)
+
+wsfw.chain.distinct <- wsfw.chain %>% distinct(qName, .keep_all = T) %>% select(qName, refName)
+
+thetas.chest.peaks <- thetas.chest.peaks %>% left_join(wsfw.chain.distinct, by = c("scaff" = "qName"))
+
+```
+
+```{r per_peak}
+
+#some errors when this runs that has to do with some regions not having data for all statistics
+
+peak_list <- list()
+
+for (i in 1:nrow(thetas.chest.peaks)){
+#for (i in 7){
+    #filename.out <- paste0("output/makebigdataframe/bigataframe_V2/chest_peaks", i, ".pdf")
+    #pdf(filename.out, width = 8.5, height =11)
+    filename.out <- paste0("output/makebigdataframe/bigataframe_V2/chest_peaks", i, "narrow.pdf")
+    pdf(filename.out, width = 6, height =11)
+    peak.num=i
+    
+    x.filt <- thetas.chest.peaks %>% filter(peak == peak.num)
+    x.lab <- paste(as.character(unique(x.filt$scaff)), "/", as.character(unique(x.filt$refName)))
+      
+    gene.subset <- gene.ranges %>% filter(seqid == as.character(unique(x.filt$scaff))) %>% 
+      mutate(midPos = ((end - start)/2) + start)
+
+    pop.colors <- c("#000000", "#E69F00", "#0072B2", "#009E73")
+    
+    pop.colors <- scale_color_manual(labels = c("aida", "lorentzi", "moretoni", "naimii"),
+                         values = c("#000000", "#E69F00", "#0072B2", "#009E73"),
+                         breaks = c("aida","lorentzi","moretoni","naimii"))
+    
+    pop.lines <-  scale_linetype_manual(values = c("solid", "longdash", "solid","longdash"),
+                            breaks = c("aida","lorentzi","moretoni","naimii"))
+    
+    comp.lines <-  scale_linetype_manual(values = c("solid", "solid", "longdash","longdash", "solid", "solid"),
+                             breaks=c("ai_lo","ai_na","na_lo","ai_mo","lo_mo","na_mo"), guide = "none")
+    
+    comp.colors <- scale_color_manual(labels=c("aida v. lorentzi","aida v. naimii","naimii v. lorentzi",
+                                               "aida v. moretoni","lorentzi v. moretoni","naimii v. moretoni"),
+                         values=c('#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02',"black"), 
+                         breaks=c("ai_lo","ai_na","na_lo","ai_mo","lo_mo","na_mo"))
+    
+    p.zfst <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "ZF[ST]" & linetype == "comp") %>% 
+      ggplot() +
+      geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                  method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab(expression(ZF[st])) + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "top", axis.title.x = element_blank(), axis.text.x = element_blank(), 
+            legend.title = element_blank(), axis.ticks.x = element_blank()) +
+      comp.colors + comp.lines
+    
+    p.dxy <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "D[xy]" & linetype == "comp") %>% 
+      ggplot() +
+      geom_smooth(aes(x = midPos, y = value * 10^3, color = pop, linetype = pop), 
+                  method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab(expression(D[xy] * 10^3)) + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      comp.colors + comp.lines
+    
+    p.pbs <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "PBS" & color == "single") %>%
+      ggplot() +
+      geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                  method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab("PBS") + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      pop.colors + pop.lines
+    
+    p.pi <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "pi" & color == "single") %>% 
+      ggplot() + geom_smooth(aes(x = midPos, y = value * 10^3, color = pop, linetype = pop), 
+                             method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab(expression(pi * 10^3)) + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      pop.colors + pop.lines
+      
+    p.taj <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "TajimasD" & color == "single") %>% 
+      ggplot() + geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                             method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab("Tajima's D") +
+      scale_x_continuous(labels = function(x) paste(x / 1000, "kb"), limits = c(min(x.filt$midPos), max(x.filt$midPos))) +
+      xlab(x.lab) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      pop.colors + pop.lines
+    
+    p.fay <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "fayh" & color == "single") %>% 
+      ggplot() + geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                             method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab("Fay and Wu's H") +
+      scale_x_continuous(labels = function(x) paste(x / 1000, "kb"), limits = c(min(x.filt$midPos), max(x.filt$midPos))) +
+      xlab(x.lab) + 
+      theme(legend.position = "bottom", legend.title = element_blank()) +
+      pop.colors + pop.lines
+      
+    p.genes <- ggplot() + 
+      geom_segment(data = gene.subset, aes(x = start, y = 1, xend = end, yend = 1), size = 3) + 
+      #geom_text(data = gene.subset, aes(x = midPos, y = 1, label = blast_name), angle = 45, nudge_y = 0.02) +
+      geom_text_repel(data = gene.subset, aes(x = midPos, y = 1, label = blast_name), nudge_y = 0.02, direction = "both") +
+      ylim(.99, 1.05) + theme_bw() + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank())
+    
+    big.plot <- p.zfst / p.dxy / p.pbs / p.pi / p.taj / p.fay / p.genes + 
+      plot_layout(heights = c(3, 3, 3, 3, 3, 3, 2.5))
+    
+    print(big.plot)
+    dev.off()
+}
+```
+
+
+
+```{r per_peak_just_GLIPR1_locus}
+
+#some errors when this runs that has to do with some regions not having data for all statistics
+
+peak_list <- list()
+
+#for (i in 1:nrow(thetas.chest.peaks)){
+for (i in 6){
+    filename.out <- paste0("output/makebigdataframe/bigataframe_V2/SP_peaks", i, ".pdf")
+    pdf(filename.out, width = 8.5, height =11)
+    peak.num=i
+    
+    x.filt <- thetas.chest.peaks %>% filter(peak == peak.num)
+    x.lab <- paste(as.character(unique(x.filt$scaff)), "/", as.character(unique(x.filt$refName)))
+      
+    gene.subset <- gene.ranges %>% filter(seqid == as.character(unique(x.filt$scaff))) %>% 
+      mutate(midPos = ((end - start)/2) + start)
+
+    pop.colors <- c("#000000", "#E69F00", "#0072B2", "#009E73")
+    
+    pop.colors <- scale_color_manual(labels = c("aida", "lorentzi", "moretoni", "naimii"),
+                         values = c("#000000", "#E69F00", "#0072B2", "#009E73"),
+                         breaks = c("aida","lorentzi","moretoni","naimii"))
+    
+    pop.lines <-  scale_linetype_manual(values = c("longdash", "solid", "longdash","longdash"),
+                            breaks = c("aida","lorentzi","moretoni","naimii"))
+    
+    comp.lines <-  scale_linetype_manual(values = c("solid", "longdash", "solid","longdash", "solid", "longdash"),
+                             breaks=c("ai_lo","ai_na","na_lo","ai_mo","lo_mo","na_mo"), guide = "none")
+    
+    comp.colors <- scale_color_manual(labels=c("aida v. lorentzi","aida v. naimii","naimii v. lorentzi",
+                                               "aida v. moretoni","lorentzi v. moretoni","naimii v. moretoni"),
+                         values=c('#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02',"black"), 
+                         breaks=c("ai_lo","ai_na","na_lo","ai_mo","lo_mo","na_mo"))
+    
+    p.zfst <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "ZF[ST]" & linetype == "comp") %>% 
+      ggplot() +
+      geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                  method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab(expression(ZF[st])) + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "top", axis.title.x = element_blank(), axis.text.x = element_blank(), 
+            legend.title = element_blank(), axis.ticks.x = element_blank()) +
+      comp.colors + comp.lines
+    
+    p.dxy <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "D[xy]" & linetype == "comp") %>% 
+      ggplot() +
+      geom_smooth(aes(x = midPos, y = value * 10^3, color = pop, linetype = pop), 
+                  method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab(expression(D[xy] * 10^3)) + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      comp.colors + comp.lines
+    
+    p.pbs <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "PBS" & color == "single") %>%
+      ggplot() +
+      geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                  method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab("PBS") + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      pop.colors + pop.lines
+    
+    p.pi <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "pi" & color == "single") %>% 
+      ggplot() + geom_smooth(aes(x = midPos, y = value * 10^3, color = pop, linetype = pop), 
+                             method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab(expression(pi * 10^3)) + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      pop.colors + pop.lines
+      
+    p.taj <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "TajimasD" & color == "single") %>% 
+      ggplot() + geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                             method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab("Tajima's D") +
+      scale_x_continuous(labels = function(x) paste(x / 1000, "kb"), limits = c(min(x.filt$midPos), max(x.filt$midPos))) +
+      xlab(x.lab) +
+      theme(legend.position = "none", axis.title.x = element_blank(), 
+            axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+      pop.colors + pop.lines
+    
+    p.fay <- thetas.chest.peaks %>% 
+      filter(peak == peak.num & stat == "fayh" & color == "single") %>% 
+      ggplot() + geom_smooth(aes(x = midPos, y = value, color = pop, linetype = pop), 
+                             method = "loess", se = F, formula = y ~ x, span=0.2) +
+      theme_bw() + ylab("Fay and Wu's H") +
+      scale_x_continuous(labels = function(x) paste(x / 1000, "kb"), limits = c(min(x.filt$midPos), max(x.filt$midPos))) +
+      xlab(x.lab) + 
+      theme(legend.position = "bottom", legend.title = element_blank()) +
+      pop.colors + pop.lines
+      
+    p.genes <- ggplot() + 
+      geom_segment(data = gene.subset, aes(x = start, y = 1, xend = end, yend = 1), size = 3) + 
+      #geom_text(data = gene.subset, aes(x = midPos, y = 1, label = blast_name), angle = 45, nudge_y = 0.02) +
+      geom_text_repel(data = gene.subset, aes(x = midPos, y = 1, label = blast_name), nudge_y = 0.02, direction = "both") +
+      ylim(.99, 1.05) + theme_bw() + xlim(min(x.filt$midPos), max(x.filt$midPos)) +
+      theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank())
+    
+    big.plot <- p.zfst / p.dxy / p.pbs / p.pi / p.taj / p.fay / p.genes + 
+      plot_layout(heights = c(3, 3, 3, 3, 3, 3, 2.5))
+    
+    print(big.plot)
+    dev.off()
+}
+```

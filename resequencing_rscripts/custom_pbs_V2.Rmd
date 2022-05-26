@@ -1,0 +1,400 @@
+---
+title: "custom_pbs"
+author: "Erik Enbody"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(methods)
+library(optparse)
+library(ggplot2)
+library(qqman)
+library(dplyr)
+library(stringr)
+library(cowplot)
+library(tidyr)
+library(reshape2)
+library(rtracklayer)
+library(data.table)
+library(ggrepel)
+#bioclite install
+#library(ensembldb)
+#library(EnsDb.Hsapiens.v79)
+#library(EnsDb.Hsapiens.v86)
+```
+
+
+```{r source_helper_scripts}
+#rm(list=ls())
+source("annotation_import.r")#this isnt used here
+source("pbs_functions.R")
+
+```
+
+```{r load_all_pops}
+
+ai_lo_lf<-read.table("data/pub_ready/angsd_output_lowfilt/aida_lorentzi_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zai_lo<- read.table("data/pub_ready/angsd_output_lowfilt/aida_lorentzi_zchr_low_filter_NR_OL_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+ai_lo <- input_fst(ai_lo_lf,zai_lo)
+plot.ai_lo <- manc(ai_lo)
+
+
+ai_mo_lf<-read.table("data/pub_ready/angsd_output_lowfilt/aida_moretoni_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zai_mo<- read.table("data/pub_ready/angsd_output_lowfilt/aida_moretoni_zchr_low_filter_NR_OL_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+ai_mo <- input_fst(ai_mo_lf,zai_mo)
+plot.ai_mo <- manc(ai_mo)
+
+
+ai_na_lf<-read.table("data/pub_ready/angsd_output_lowfilt/aida_naimii_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zai_na <- read.table("data/pub_ready/angsd_output_lowfilt/aida_naimii_zchr_low_filter_NR_OL_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+ai_na <- input_fst(ai_na_lf,zai_na)
+plot.ai_na <- manc(ai_na)
+
+lo_mo_lf<-read.table("data/pub_ready/angsd_output_lowfilt/lorentzi_moretoni_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zlo_mo <- read.table("data/pub_ready/angsd_output_lowfilt/lorentzi_moretoni_zchr_low_filter_NR_OL_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+lo_mo <- input_fst(lo_mo_lf,zlo_mo)
+plot.lo_mo <- manc(lo_mo)
+
+
+na_lo_lf<-read.table("data/pub_ready/angsd_output_lowfilt/naimii_lorentzi_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zna_lo <- read.table("data/pub_ready/angsd_output_lowfilt/naimii_lorentzi_zchr_low_filter_NR_OL_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+na_lo <- input_fst(na_lo_lf,zna_lo)
+plot.na_lo <- manc(na_lo)
+
+na_mo_lf<-read.table("data/pub_ready/angsd_output_lowfilt/naimii_moretoni_NR50kb.pbs.txt", header=FALSE,row.names=NULL,skip=1)
+zna_mo <- read.table("data/pub_ready/angsd_output_lowfilt/naimii_moretoni_zchr_low_filter_NR_OL_50000-Win.fst.txt", header=FALSE,row.names=NULL,skip=1)
+na_mo <- input_fst(na_mo_lf,zna_mo)
+plot.na_mo <- manc(na_mo)
+
+```
+
+```{r overlap_all}
+
+ai_lo.fst <- ai_lo %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>% select(full.pos, fst) %>% dplyr::rename(ai_lo.fst = fst) 
+ai_mo.fst <- ai_mo %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>% select(full.pos, fst) %>% dplyr::rename(ai_mo.fst = fst)
+ai_na.fst <- ai_na %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>% select(full.pos, fst) %>% dplyr::rename(ai_na.fst = fst)
+lo_mo.fst <- lo_mo %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>% select(full.pos, fst) %>% dplyr::rename(lo_mo.fst = fst)
+na_lo.fst <- na_lo %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>% select(full.pos, fst) %>% dplyr::rename(na_lo.fst = fst)
+na_mo.fst <- na_mo %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>% select(full.pos, fst) %>% dplyr::rename(na_mo.fst = fst)
+
+info.fst <- ai_lo %>% mutate(full.pos = paste(scaff, midPos, sep = ".")) %>%  select(-fst, -zfst)
+
+#bind_cols(info.fst, ai_lo.fst, ai_mo.fst)
+
+all.pops <- info.fst %>% left_join(ai_lo.fst, by = "full.pos") %>%
+  left_join(ai_mo.fst, by = "full.pos") %>%
+  left_join(ai_na.fst, by = "full.pos") %>% 
+  left_join(lo_mo.fst, by = "full.pos") %>% 
+  left_join(na_lo.fst, by = "full.pos") %>% 
+  left_join(na_mo.fst, by = "full.pos")
+
+#take closest relative, which is also the same as the alternative phenotype
+all.pops <- all.pops %>% 
+  mutate(aida.pbs = ((-log(1-ai_na.fst)) + (-log(1-ai_lo.fst)) - (-log(1-na_lo.fst))) / 2) %>% 
+  mutate(naim.pbs = ((-log(1-ai_na.fst)) + (-log(1-na_lo.fst)) - (-log(1-ai_lo.fst))) / 2) %>% 
+  mutate(more.pbs = ((-log(1-na_mo.fst)) + (-log(1-lo_mo.fst)) - (-log(1-na_lo.fst))) / 2) %>% 
+  mutate(lore.pbs = ((-log(1-ai_lo.fst)) + (-log(1-na_lo.fst)) - (-log(1-ai_na.fst))) / 2) #uses  naimii as outgroup
+  
+#strictly for plotting lazily (so I don't need to say diff variabile each time)
+aida.pbs <- all.pops %>% dplyr::rename(pbs = aida.pbs)
+naim.pbs <- all.pops %>% dplyr::rename(pbs = naim.pbs)
+lore.pbs <- all.pops %>% dplyr::rename(pbs = lore.pbs)
+more.pbs <- all.pops %>% dplyr::rename(pbs = more.pbs)
+
+#take the other option for species 3
+all.pops <- all.pops %>% 
+  mutate(aida.pbsV2 = ((-log(1-ai_mo.fst)) + (-log(1-ai_lo.fst)) - (-log(1-lo_mo.fst))) / 2) %>% 
+  mutate(naim.pbsV2 = ((-log(1-na_mo.fst)) + (-log(1-na_lo.fst)) - (-log(1-lo_mo.fst))) / 2) %>% 
+  mutate(more.pbsV2 = ((-log(1-ai_mo.fst)) + (-log(1-lo_mo.fst)) - (-log(1-ai_lo.fst))) / 2) %>% 
+  mutate(lore.pbsV2 = ((-log(1-lo_mo.fst)) + (-log(1-na_lo.fst)) - (-log(1-na_mo.fst))) / 2) #uses  naimii as outgroup
+  
+#strictly for plotting lazily (so I don't need to say diff variabile each time)
+aida.pbsV2 <- all.pops %>% dplyr::rename(pbs = aida.pbsV2)
+naim.pbsV2 <- all.pops %>% dplyr::rename(pbs = naim.pbsV2)
+lore.pbsV2 <- all.pops %>% dplyr::rename(pbs = lore.pbsV2)
+more.pbsV2 <- all.pops %>% dplyr::rename(pbs = more.pbsV2)
+
+write.csv(all.pops, "output/custom_pbs/all_pops_df.csv", row.names = F)
+```
+
+```{r pbs.manc}
+pdf("output/custom_pbs/aida.pbs.pdf",height=3,width=16)
+manc.pbs(aida.pbs)
+dev.off()
+
+pdf("output/custom_pbs/lorentzi.pbs.pdf",height=3,width=16)
+manc.pbs(lore.pbs)
+dev.off()
+
+pdf("output/custom_pbs/moretoni.pbs.pdf",height=3,width=16)
+manc.pbs(more.pbs)
+dev.off()
+
+pdf("output/custom_pbs/naimii.pbs.pdf",height=3,width=16)
+manc.pbs(naim.pbs)
+dev.off()
+
+pdf("output/custom_pbs/aida.pbsV2.pdf",height=3,width=16)
+manc.pbs(aida.pbsV2)
+dev.off()
+
+pdf("output/custom_pbs/lorentzi.pbsV2.pdf",height=3,width=16)
+manc.pbs(lore.pbsV2)
+dev.off()
+
+pdf("output/custom_pbs/moretoni.pbsV2.pdf",height=3,width=16)
+manc.pbs(more.pbsV2)
+dev.off()
+
+pdf("output/custom_pbs/naimii.pbsV2.pdf",height=3,width=16)
+manc.pbs(naim.pbsV2)
+dev.off()
+
+p1 <- manc.pbs(aida.pbs) + ggtitle("aida")
+p2 <- manc.pbs(lore.pbs) + ggtitle("lorentzi")
+p3 <- manc.pbs(more.pbs) + ggtitle("moretoni")
+p4 <- manc.pbs(naim.pbs) + ggtitle("naimii")
+
+p5 <- manc.pbs(aida.pbsV2) + ggtitle("aida") 
+p6 <- manc.pbs(lore.pbsV2) + ggtitle("lorentzi")
+p7 <- manc.pbs(more.pbsV2) + ggtitle("moretoni")
+p8 <- manc.pbs(naim.pbsV2) + ggtitle("naimii")
+
+#pdf("output/custom_pbs/grid_pbsV1.pdf",height=29.7,width=42)
+png("output/custom_pbs/grid_pbsV1.png",height=29.7,width=42, units = "cm", res = 300)
+plot_grid(p1, p2, p3 ,p4, nrow = 4, ncol = 1)
+dev.off()
+
+png("output/custom_pbs/grid_pbsV2.png",height=29.7,width=42, units = "cm", res = 300)
+plot_grid(p5, p6, p7 ,p8, nrow = 4, ncol = 1)
+dev.off()
+
+A_1A <- aida.pbs %>% filter(chr == "chromosome_1A") %>% manc.pbs() + ggtitle("aida")
+B_1A <- lore.pbs %>% filter(chr == "chromosome_1A") %>% manc.pbs() + ggtitle("lorentzi")
+C_1A <- more.pbs %>% filter(chr == "chromosome_1A") %>% manc.pbs() + ggtitle("moretoni")
+D_1A <- naim.pbs %>% filter(chr == "chromosome_1A") %>% manc.pbs() + ggtitle("naimii")
+
+png("output/custom_pbs/chr1A_pbs.png",height=29.7,width=42, units = "cm", res = 300)
+plot_grid(A_1A, B_1A, C_1A ,D_1A, nrow = 4, ncol = 1)
+dev.off()
+
+naim.pbs %>% filter(chr == "chromosome_4") %>% manc.pbs() + ggtitle("naimii")
+naim.pbs %>% filter(chr == "chromosome_3") %>% manc.pbs() + ggtitle("naimii")
+
+```
+
+```{r pbs_compare}
+pdf("output/custom_pbs/grid_pbs1_v_2.pdf",height=29.7,width=42)
+plot(all.pops$aida.pbs ~ all.pops$aida.pbsV2)
+plot(all.pops$lore.pbs ~ all.pops$lore.pbsV2)
+plot(all.pops$more.pbs ~ all.pops$more.pbsV2)
+plot(all.pops$naim.pbs ~ all.pops$naim.pbsV2)
+dev.off()
+
+all.142 <- all.pops %>% filter(scaff == "scaffold_142")
+
+ggplot() + geom_point(data = all.pops, aes(x = naim.pbs, y = naim.pbsV2)) +
+  geom_point(data = all.142, aes(x=naim.pbs, y = naim.pbsV2, color = "red"))
+
+ggplot() + geom_point(data = all.pops, aes(x = aida.pbs, y = aida.pbsV2)) +
+  geom_point(data = all.142, aes(x=aida.pbs, y = aida.pbsV2, color = "red"))
+
+ggplot() + geom_point(data = all.pops, aes(x = more.pbs, y = more.pbsV2)) +
+  geom_point(data = all.142, aes(x=more.pbs, y = more.pbsV2, color = "red"))
+
+ggplot() + geom_point(data = all.pops, aes(x = naim.pbs, y = lore.pbs))
+
+```
+
+```{r pca_regression}
+head(all.pops[,c("aida.pbs", "naim.pbs", "more.pbs", "lore.pbs")])
+
+#     PBS0     PBS1     PBS2
+#1 0.087328 0.043486 0.263013
+#2 0.074644 0.044429 0.263273
+#3 0.064346 0.055794 0.162877
+#4 0.101188 0.096896 0.181681
+#5 0.066585 0.070418 0.179231
+#6 0.200786 0.025039 0.173593
+all.pops4pca <- all.pops[,c("aida.pbs", "naim.pbs", "more.pbs", "lore.pbs")] %>% filter(!is.na(aida.pbs) & !is.na(naim.pbs) & !is.na(more.pbs) & !is.na(lore.pbs))
+
+fpbs.pca <- prcomp(all.pops4pca, center = TRUE,scale. = TRUE)
+summary(fpbs.pca)
+library(ggbiplot)
+
+ggbiplot(fpbs.pca)
+
+all.pops.f <- all.pops %>%filter(!is.na(aida.pbs) & !is.na(naim.pbs) & !is.na(more.pbs) & !is.na(lore.pbs))
+
+all.pops.f$pc1<-fpbs.pca$x[,1]
+all.pops.f$pc2<-fpbs.pca$x[,2]
+plot(all.pops.f$aida.pbs ~ all.pops.f$pc1)
+plot(all.pops.f$naim.pbs ~ all.pops.f$pc1)
+plot(all.pops.f$more.pbs ~ all.pops.f$pc1)
+plot(all.pops.f$lore.pbs ~ all.pops.f$pc1)
+
+
+
+lore.outlier <- all.pops.f %>% filter(lore.pbs > 1.5 & pc1 > -6)
+ggplot() + geom_point(data = all.pops.f, aes(x = pc1, y = lore.pbs)) + 
+  geom_point(data = lore.outlier, aes(x = pc1, y = lore.pbs), color = "red")
+
+
+ggplot() + 
+  geom_point(data= all.pops.f[all.pops.f$chr == "chromosome_1A",], aes(x = zefi_start, y = lore.pbs)) + 
+  geom_point(data = lore.outlier[lore.outlier$chr == "chromosome_1A",], aes(x = zefi_start, y = lore.pbs),col="red")
+
+ggplot() + 
+  geom_point(data= all.pops.f[all.pops.f$chr == "chromosome_1",], aes(x = zefi_start, y = lore.pbs)) + 
+  geom_point(data = lore.outlier[lore.outlier$chr == "chromosome_1",], aes(x = zefi_start, y = lore.pbs),col="red")
+
+ggplot() + 
+  geom_point(data= all.pops.f[all.pops.f$chr == "chromosome_12",], aes(x = zefi_start, y = lore.pbs)) + 
+  geom_point(data = lore.outlier[lore.outlier$chr == "chromosome_12",], aes(x = zefi_start, y = lore.pbs),col="red")
+
+ggplot() + 
+  geom_point(data= all.pops.f[all.pops.f$chr == "chromosome_4",], aes(x = zefi_start, y = lore.pbs)) + 
+  geom_point(data = lore.outlier[lore.outlier$chr == "chromosome_4",], aes(x = zefi_start, y = lore.pbs),col="red")
+
+```
+
+
+```{r annotate}
+
+# peaks -------------------------------------------------------------------
+pops <- list(lore.pbs, more.pbs, naim.pbs, aida.pbs)
+
+datalist = list()
+
+for (i in 1:4) {
+  #print(pop)
+  pop.pbs <- as.data.frame(pops[i])
+  pop.peaks.A <- pop.pbs %>% filter(chr!="chromosome_Z") %>% 
+    filter(pbs >= quantile(pbs,.999,na.rm=T)) %>% mutate(start = midPos - 25000, end = midPos + 25000)
+  pop.peaks.Z <- pop.pbs %>% filter(chr=="chromosome_Z") %>% 
+    filter(pbs >= quantile(pbs,.999,na.rm=T)) %>% mutate(start = midPos - 25000, end = midPos + 25000)
+  pop.peaks <-rbind(pop.peaks.A, pop.peaks.Z)
+  r.pop.peaks <- GRanges(pop.peaks$scaff, IRanges(start = pop.peaks$start, end = pop.peaks$end))
+  fo.pop <- findOverlaps(r.pop.peaks, r.gene.ranges)
+  pop.overlap <- gene.ranges[subjectHits(fo.pop), ]  %>% 
+    mutate(comp = i) 
+  out.genes <- unique(pop.overlap$blast_name)
+  
+  datalist[[i]] <- pop.overlap # add it to your list
+  #print(out.genes)
+}
+
+big_data = do.call(rbind, datalist)
+unique(big_data$blast_name)
+
+
+
+de.genes <- read.csv("data/all_de_genes.csv")
+
+# annotate ----------------------------------------------------------------
+big_data <- big_data %>% 
+  mutate(melano.list = ifelse(blast_name %in% mel$gene_name, "Y", "N")) %>% 
+  mutate(keratin.follicle = ifelse(grepl("KRF", blast_name), "Y", "N")) %>% 
+  mutate(de.gene = ifelse(Name %in% de.genes$gene_name, "Y", "N")) %>% 
+  mutate(fe.gene = ifelse(blast_name %in% fe_cand$gene_id, "Y", "N"))
+
+f.big_data <- big_data %>% mutate(full.pos = paste0(comp, Name)) %>% distinct(full.pos, .keep_all = T) %>% 
+  mutate(comp.full = ifelse(comp == 1, "lore",
+                            ifelse(comp ==2, "more",
+                                   ifelse(comp == 3, "naim",
+                                          ifelse(comp == 4, "aida", NA)))))
+
+f.big_data %>% group_by(comp.full) %>% 
+  dplyr::summarise(n = n())
+
+wsfw.zefi.chain <- fread("data/satsuma_chain_file/ensembl/FORMATTED_satsuma_summary.chained_ensembl.out")
+gr1 <- GRanges(wsfw.zefi.chain$wsfw_scaff, IRanges(wsfw.zefi.chain$wsfw_start, wsfw.zefi.chain$wsfw_end), zefi = wsfw.zefi.chain$chr, zefi_start = wsfw.zefi.chain$zefi_start, zefi_end = wsfw.zefi.chain$zefi_end)
+
+
+gr2 <- GRanges(f.big_data$seqid, ranges = IRanges(f.big_data$start, width = 1))
+
+fo <- suppressWarnings(findOverlaps(gr1, gr2, maxgap = 650))
+f.big_data.overlap <- cbind(wsfw.zefi.chain[queryHits(fo), ], f.big_data[subjectHits(fo), ])
+
+lore.ann <- f.big_data.overlap %>% filter(comp.full == "lore") %>% 
+  distinct(Name, .keep_all = TRUE) %>% select(chr, zefi_start, seqid, start, Name, blast_name) 
+
+more.ann <- f.big_data.overlap %>% filter(comp.full == "more") %>% 
+  distinct(Name, .keep_all = TRUE) %>% select(chr, zefi_start, seqid, start, Name, blast_name) 
+
+naim.ann <- f.big_data.overlap %>% filter(comp.full == "naim") %>% 
+  distinct(Name, .keep_all = TRUE) %>% select(chr, zefi_start, seqid, start, Name, blast_name)
+
+aida.ann <- f.big_data.overlap %>% filter(comp.full == "aida") %>% 
+  distinct(Name, .keep_all = TRUE) %>% select(chr, zefi_start, seqid, start, Name, blast_name) 
+
+```
+
+```{r peaks}
+pop.peaks.Lore<- lore.pbs %>% filter(chr!="chromosome_Z") %>% 
+  filter(pbs >= quantile(pbs,.999,na.rm=T)) %>% mutate(start = midPos - 25000, end = midPos + 25000)
+pop.peaks.LoreZ <- lore.pbs %>% filter(chr=="chromosome_Z") %>% 
+  filter(pbs >= quantile(pbs,.999,na.rm=T)) %>% mutate(start = midPos - 25000, end = midPos + 25000)
+
+peaks_lore <- rbind(pop.peaks.Lore, pop.peaks.LoreZ)
+
+range.peaks_lore <- GRanges(peaks_lore$scaff, peaks_lore$midPos)
+
+reduce.range.peaks_lore <- GenomicRanges::reduce(range.peaks_lore, min.gapwidth = 100000)
+
+f.peaks_lore <- as.data.frame(reduce.range.peaks_lore)
+f.peaks_lore %>% filter(width > 1) %>% nrow()
+
+f.peaks_lore %>% filter(width > 1) %>% write_csv("output/sp_outlier_peaks_PBS.csv")
+```
+
+```{r manc_labels}
+lore.label.plot <- manc.labels.pbs(lore.pbs, lore.ann)
+naim.label.plot <- manc.labels.pbs(naim.pbs, naim.ann)
+aida.label.plot <- manc.labels.pbs(aida.pbs, aida.ann)
+more.label.plot <- manc.labels.pbs(more.pbs, more.ann)
+```
+
+```{r output_for_bigdataframe}
+head(all.pops)
+all.pops.PBS <- all.pops %>% select(scaff, midPos, lore.pbs, naim.pbs, aida.pbs, more.pbs) %>% 
+  dplyr::rename(lorentzi = lore.pbs, naimii = naim.pbs, aida = aida.pbs, moretoni = more.pbs) %>% 
+  pivot_longer(cols = c(lorentzi, naimii, aida, moretoni), names_to = "pop", values_to = "value") %>% 
+  mutate(stat = "PBS")
+
+save(all.pops.PBS, file = "output/custom_pbs/pbs_output_V2.rda")
+```
+
+
+```{r output_ZFst_for_consistency}
+
+zfst.fnc <- function(x, na.rm = T) (x - mean(x, na.rm = na.rm)) / sd(x, na.rm)
+
+all.pops.zfst.AUTO <- all.pops %>% select(scaff_num, midPos, chr, contains("fst")) %>% 
+  filter(!grepl("Z", chr)) %>% select(-chr) %>% 
+  mutate_at(vars(contains("fst")), zfst.fnc) %>% 
+  mutate(scaff = paste0("scaffold_", scaff_num)) %>% 
+  select(-scaff_num) %>% 
+  pivot_longer(cols = c(-scaff, -midPos), names_to = "pop", values_to = "value") %>% 
+  mutate(pop = gsub(".fst", "", pop),
+         stat = "ZF[ST]")
+
+all.pops.zfst.Z <- all.pops %>% select(scaff_num, midPos, chr, contains("fst")) %>% 
+  filter(grepl("Z", chr)) %>% select(-chr) %>% 
+  mutate_at(vars(contains("fst")), zfst.fnc) %>% 
+  mutate(scaff = paste0("scaffold_", scaff_num)) %>% 
+  select(-scaff_num) %>% 
+  pivot_longer(cols = c(-scaff, -midPos), names_to = "pop", values_to = "value") %>% 
+  mutate(pop = gsub(".fst", "", pop),
+         stat = "ZF[ST]")
+
+
+all.pops.zfst.out <- rbind(all.pops.zfst.AUTO, all.pops.zfst.Z)
+save(all.pops.zfst.out, file = "output/custom_pbs/zfst_output_V2.rda")
+```

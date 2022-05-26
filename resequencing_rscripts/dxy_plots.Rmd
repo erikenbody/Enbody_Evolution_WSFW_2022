@@ -1,0 +1,199 @@
+---
+title: "dxy_pub_ready"
+author: "Erik Enbody"
+date: "7/7/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r packages}
+library(ggplot2)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Chest - scaffold 142
+
+```{r chest_input}
+ai_lo_dxyC<-read.table("data/dxy_outlier_scaff/aida_lorentzi_dxy.win.txt", header=TRUE,row.names=NULL)
+
+ai_mo_dxyC<-read.table("data/dxy_outlier_scaff/aida_moretoni_dxy.win.txt", header=TRUE,row.names=NULL)
+
+ai_na_dxyC<-read.table("data/dxy_outlier_scaff/aida_naimii_dxy.win.txt", header=TRUE,row.names=NULL)
+
+lo_mo_dxyC<-read.table("data/dxy_outlier_scaff/lorentzi_moretoni_dxy.win.txt", header=TRUE,row.names=NULL)
+
+na_lo_dxyC<-read.table("data/dxy_outlier_scaff/naimii_lorentzi_dxy.win.txt", header=TRUE,row.names=NULL)
+
+na_mo_dxyC<-read.table("data/dxy_outlier_scaff/naimii_moretoni_dxy.win.txt", header=TRUE,row.names=NULL)
+
+```
+
+
+```{r plot_kitlg}
+Cgene_scaf<-142
+Cgene_start<-1352258
+Cgene_end<-1380411
+Cgene_name<-"KITLG"
+pdf("output/dxy/dxt_kitlg.pdf",height=4,width=12)
+ggplot() + 
+  geom_line(data=subset(ai_mo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_mo"),color="grey",size=1.5) +
+  geom_line(data=subset(ai_lo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. aida"),size=1.5) +
+  geom_line(data=subset(lo_mo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. moretoni"),size=1.5) +
+  geom_line(data=subset(na_lo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_lo"),color="grey",size=1.5) +
+  geom_line(data=subset(ai_na_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="aida vs. naimii"),size=1.5) +
+  geom_line(data=subset(na_mo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="moretoni vs. naimii"),size=1.5) +
+  labs(y = expression(D[xy]), x = NULL, size=2) +
+  theme_classic() + theme(legend.justification = c(1, 1),
+                          legend.position = c(1, 1),
+                          legend.title=element_blank(),
+                          text = element_text(size=20)) +  
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE),limits=c(1200000,1500000)) +
+  ylim(0,.005) +
+  geom_segment(aes(x = Cgene_start, y = .0045, xend = Cgene_end, yend = 0.0045)) +
+  annotate("text", x = Cgene_start, y = .0047, label = Cgene_name)
+dev.off()
+
+
+ggplot() + 
+  geom_point(data=subset(ai_mo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_mo"),color="grey",size=1.5) +
+  geom_point(data=subset(ai_lo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. aida"),size=1.5) +
+  geom_point(data=subset(lo_mo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. moretoni"),size=1.5) +
+  geom_point(data=subset(na_lo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_lo"),color="grey",size=1.5) +
+  geom_point(data=subset(ai_na_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="aida vs. naimii"),size=1.5) +
+  geom_point(data=subset(na_mo_dxyC,scaff==Cgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="moretoni vs. naimii"),size=1.5) +
+  labs(y = expression(D[xy]), x = NULL, size=2) +
+  theme_classic() + theme(legend.justification = c(1, 1),
+                          legend.position = c(1, 1),
+                          legend.title=element_blank(),
+                          text = element_text(size=20)) +  
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE),limits=c(1000000,1700000)) +
+  ylim(0,.005) +
+  geom_segment(aes(x = Cgene_start, y = .0045, xend = Cgene_end, yend = 0.0045)) +
+  annotate("text", x = Cgene_start, y = .0047, label = Cgene_name)
+
+```
+
+#### SP - scaffolds 
+
+```{r chest_input}
+ai_lo_dxyS<-read.table("data/dxy_outlier_scaff/sp/aida_lorentzi_dxy.win.txt", header=TRUE,row.names=NULL)
+
+ai_mo_dxyS<-read.table("data/dxy_outlier_scaff/sp/aida_moretoni_dxy.win.txt", header=TRUE,row.names=NULL)
+
+ai_na_dxyS<-read.table("data/dxy_outlier_scaff/sp/aida_naimii_dxy.win.txt", header=TRUE,row.names=NULL)
+
+lo_mo_dxyS<-read.table("data/dxy_outlier_scaff/sp/lorentzi_moretoni_dxy.win.txt", header=TRUE,row.names=NULL)
+
+na_lo_dxyS<-read.table("data/dxy_outlier_scaff/sp/naimii_lorentzi_dxy.win.txt", header=TRUE,row.names=NULL)
+
+na_mo_dxyS<-read.table("data/dxy_outlier_scaff/sp/naimii_moretoni_dxy.win.txt", header=TRUE,row.names=NULL)
+
+```
+
+```{r sp}
+Lgene_scaf<-278
+Lgene_start<-198850
+Lgene_end<-205401
+Lgene_name<-"ARCN1"
+pdf("output/dxy/dxt_arcn1.pdf",height=4,width=12)
+ggplot() + 
+  geom_line(data=subset(ai_mo_dxyS,scaff==Lgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_mo"),color="grey",size=1.5) +
+  geom_line(data=subset(ai_lo_dxyS,scaff==Lgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. aida"),size=1.5) +
+  geom_line(data=subset(lo_mo_dxyS,scaff==Lgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. moretoni"),size=1.5) +
+  geom_line(data=subset(na_lo_dxyS,scaff==Lgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lorentzi vs. naimii"),size=1.5) +
+  geom_line(data=subset(ai_na_dxyS,scaff==Lgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_na"),color="grey",size=1.5) +
+  geom_line(data=subset(na_mo_dxyS,scaff==Lgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_mo"),color="grey",size=1.5) +
+  labs(y = expression(D[xy]), x = NULL, size=2) +
+  theme_classic() + theme(legend.justification = c(1, 1),
+                          legend.position = c(1, 1),
+                          legend.title=element_blank(),
+                          text = element_text(size=20)) +
+  xlim(0,.51e6) + ylim(0,0.016)+
+  geom_segment(aes(x = Lgene_start, y = 0.012, xend = Lgene_end, yend = 0.012)) +
+  annotate("text", x = Lgene_start, y = 0.0125, label = Lgene_name)
+dev.off()
+
+Mgene_scaf<-239
+Mgene_start<-265291
+Mgene_end<-290524
+Mgene_name<-"DHRS12"
+pdf("output/dxy/dxt_dhsr.pdf",height=4,width=12)
+ggplot() + 
+  geom_line(data=subset(ai_mo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_mo"),color="grey",size=1.5) +
+  geom_line(data=subset(ai_lo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_lo"),size=1.5) +
+  geom_line(data=subset(lo_mo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lo_mo"),size=1.5) +
+  geom_line(data=subset(na_lo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_lo"),size=1.5) +
+  geom_line(data=subset(ai_na_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_na"),color="grey",size=1.5) +
+  geom_line(data=subset(na_mo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_mo"),color="grey",size=1.5) +
+  labs(y = expression(D[xy]), x = NULL, size=2) +
+  theme_classic() + theme(legend.position = "none",text = element_text(size=20)) +
+  xlim(0,.35e6) + ylim(0,0.008)+
+  geom_segment(aes(x = Mgene_start, y = 0.007, xend = Mgene_end, yend = 0.007)) +
+  annotate("text", x = Mgene_start, y = 0.0075, label = Mgene_name)
+dev.off()
+
+
+Mgene_scaf<-36
+Mgene_start<-265291
+Mgene_end<-290524
+#Mgene_name<-"DHRS12"
+#pdf("output/dxy/dxt_scaf36.pdf",height=4,width=12)
+ggplot() + 
+  geom_line(data=subset(ai_mo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_mo"),color="grey",size=1.5) +
+  geom_line(data=subset(ai_lo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_lo"),size=1.5) +
+  geom_line(data=subset(lo_mo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="lo_mo"),size=1.5) +
+  geom_line(data=subset(na_lo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_lo"),size=1.5) +
+  geom_line(data=subset(ai_na_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="ai_na"),color="grey",size=1.5) +
+  geom_line(data=subset(na_mo_dxyS,scaff==Mgene_scaf),aes(x=win_mid,y=dxy_sumrel,colour="na_mo"),color="grey",size=1.5) +
+  labs(y = expression(D[xy]), x = NULL, size=2) +
+  theme_classic() + theme(legend.position = "none",text = element_text(size=20))+
+  xlim(4e6,5e6) #+ ylim(0,0.008)+
+  #geom_segment(aes(x = Mgene_start, y = 0.007, xend = Mgene_end, yend = 0.007)) +
+  #annotate("text", x = Mgene_start, y = 0.0075, label = Mgene_name)
+#dev.off()
+
+```
+
+
+```{r 4makebigdataframe}
+
+ai_lo_dxy<-rbind(ai_lo_dxyC,ai_lo_dxyS)
+ai_lo_dxy2<-ai_lo_dxy%>%select(chromo,win_mid,dxy_sumrel)%>%rename(c("chromo"="scaff","win_mid"="midPos","dxy_sumrel"="value"))
+ai_lo_dxy2$pop<-"ai_lo"
+#dput(ai_lo_dxy2,"output/makebigdataframe/ai_lo_dxy.db")
+
+ai_mo_dxy<-rbind(ai_mo_dxyC,ai_mo_dxyS)
+ai_mo_dxy2<-ai_mo_dxy%>%select(chromo,win_mid,dxy_sumrel)%>%rename(c("chromo"="scaff","win_mid"="midPos","dxy_sumrel"="value"))
+ai_mo_dxy2$pop<-"ai_mo"
+#dput(ai_mo_dxy2,"output/makebigdataframe/ai_mo_dxy.db")
+
+ai_na_dxy<-rbind(ai_na_dxyC,ai_na_dxyS)
+ai_na_dxy2<-ai_na_dxy%>%select(chromo,win_mid,dxy_sumrel)%>%rename(c("chromo"="scaff","win_mid"="midPos","dxy_sumrel"="value"))
+ai_na_dxy2$pop<-"ai_na"
+#dput(ai_na_dxy2,"output/makebigdataframe/ai_na_dxy.db")
+
+lo_mo_dxy<-rbind(lo_mo_dxyC,lo_mo_dxyS)
+lo_mo_dxy2<-lo_mo_dxy%>%select(chromo,win_mid,dxy_sumrel)%>%rename(c("chromo"="scaff","win_mid"="midPos","dxy_sumrel"="value"))
+lo_mo_dxy2$pop<-"lo_mo"
+#dput(lo_mo_dxy2,"output/makebigdataframe/lo_mo_dxy.db")
+
+na_lo_dxy<-rbind(na_lo_dxyC,na_lo_dxyS)
+na_lo_dxy2<-na_lo_dxy%>%select(chromo,win_mid,dxy_sumrel)%>%rename(c("chromo"="scaff","win_mid"="midPos","dxy_sumrel"="value"))
+na_lo_dxy2$pop<-"na_lo"
+#dput(na_lo_dxy2,"output/makebigdataframe/na_lo_dxy.db")
+
+na_mo_dxy<-rbind(na_mo_dxyC,na_mo_dxyS)
+na_mo_dxy2<-na_mo_dxy%>%select(chromo,win_mid,dxy_sumrel)%>%rename(c("chromo"="scaff","win_mid"="midPos","dxy_sumrel"="value"))
+na_mo_dxy2$pop<-"na_mo"
+#dput(na_mo_dxy2,"output/makebigdataframe/na_mo_dxy.db")
+
+dxy_out<-rbind(ai_lo_dxy2,ai_mo_dxy2,ai_na_dxy2,lo_mo_dxy2,na_lo_dxy2,na_mo_dxy2)
+dxy_out$stat<-"D[xy]"
+#dput(dxy_out,"output/makebigdataframe/dxy_out.db")
+save(dxy_out,file="output/makebigdataframe/dxy_out.rda")
+
+```

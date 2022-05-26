@@ -1,0 +1,130 @@
+---
+title: "thetas.Rmd"
+author: "Erik Enbody"
+date: "8/6/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(methods)
+library(optparse)
+library(ggplot2)
+library(qqman)
+library(tidyverse)
+library(stringr)
+library(cowplot)
+library(reshape2)
+library(data.table)
+library(zoo)
+library(windowscanr)
+```
+
+ANGSD Window based
+
+```{r import_function}
+
+thetas.read <- function(thetas.path){
+  df.theta<-fread(thetas.path)
+  pop.lab = gsub("_theta.thetasWindow.gz.pestPG", "",basename(thetas.path))
+  df.theta.long <- df.theta %>% mutate(pi = tP / nSites,
+                      tW_ps = tW / nSites,
+                      pop = pop.lab) %>% 
+    select(Chr, WinCenter, pop, Tajima, pi, fayh, tW_ps) %>% 
+    dplyr::rename(TajimasD = Tajima) %>% 
+    pivot_longer(cols = c(-Chr, - WinCenter, -pop), names_to = "stat", values_to = "value")
+  df.theta.long
+}
+
+theta.aida <- thetas.read("data/thetas/aida_theta.thetasWindow.gz.pestPG")
+theta.more <- thetas.read("data/thetas/moretoni_theta.thetasWindow.gz.pestPG")
+theta.naim <- thetas.read("data/thetas/naimii_theta.thetasWindow.gz.pestPG")
+theta.lore <- thetas.read("data/thetas/lorentzi_theta.thetasWindow.gz.pestPG")
+
+thetas_outV2 <- rbind(theta.aida, theta.more, theta.naim, theta.lore)
+thetas_outV2 <- thetas_outV2 %>% 
+  dplyr::rename(midPos = WinCenter,scaff = Chr)
+save(thetas_outV2,file="output/makebigdataframe/thetas_out_V2.0.rda")
+
+```
+
+```{r mean_pi}
+source("fst_functions.R")
+
+zlinked <- wsfw.chain %>% filter(refName == "chromosome_Z")
+
+thetas_outV2 %>% filter(stat == "pi" & !scaff%in% zlinked$refName) %>% 
+  group_by(pop) %>% 
+  summarise(mean_pi = mean(value)) %>% 
+  write.csv("output/theta/mean_pop_pairwisep.csv")
+
+thetas_outV2 %>% filter(stat == "tW_ps" & !scaff%in% zlinked$refName) %>% 
+  group_by(pop) %>% 
+  summarise(mean_pi = mean(value))
+
+```
+
+```{r piplot}
+
+Cgene_scaf <- "scaffold_142"
+
+#waida2 <- waida %>% filter(nSites > 45000)#number sites doesnt change much
+ggplot() + 
+  geom_line(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=tP_ps,colour="aida"),size=1.5) +
+  geom_line(data=subset(wnaimii,Chr==Cgene_scaf),aes(x=WinCenter,y=tP_ps,colour="naimii"),size=1.5) +
+  geom_line(data=subset(wmoretoni,Chr==Cgene_scaf),aes(x=WinCenter,y=tP_ps,colour="moretoni"),size=1.5) +
+  geom_line(data=subset(wlorentzi,Chr==Cgene_scaf),aes(x=WinCenter,y=tP_ps,colour="lorentzi"),size=1.5) +
+  labs(y = "pi", x = NULL, size=2) +
+  theme_classic() + theme(legend.justification = c(1, 1),
+                          legend.position = c(1, 1),
+                          legend.title=element_blank(),
+                          text = element_text(size=20)) + 
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE),limits=c(1200000,1500000)) #+
+  #geom_segment(aes(x = Cgene_start, y = 0.002, xend = Cgene_end, yend = 0.002)) +
+  #annotate("text", x = Cgene_start, y = 0.0025, label = Cgene_name)
+```
+
+```{r tajplot}
+
+ggplot() + 
+  geom_point(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima,colour="aida"),size=1.5) +
+  geom_point(data=subset(wnaimii,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima,colour="naimii"),size=1.5) +
+  geom_point(data=subset(wmoretoni,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima,colour="moretoni"),size=1.5) +
+  geom_point(data=subset(wlorentzi,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima,colour="lorentzi"),size=1.5) +
+  labs(y = "pi", x = NULL, size=2) +
+  theme_classic() + theme(legend.justification = c(1, 1),
+                          legend.position = c(1, 1),
+                          legend.title=element_blank(),
+                          text = element_text(size=20)) + 
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE),limits=c(1000000,1500000)) #+
+  #geom_segment(aes(x = Cgene_start, y = .98, xend = Cgene_end, yend = .98)) +
+  #annotate("text", x = Cgene_start, y = 1.1, label = Cgene_name)
+```
+
+```{r check other stats}
+
+ggplot() + geom_point(data=subset(wmoretoni,Chr==Cgene_scaf),aes(x=WinCenter,y=fayh),size=1.5, color = "blue") +
+  geom_vline(xintercept = 1352258) + geom_vline(xintercept = 1352258) +
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE),limits=c(1200000,1500000))
+
+
+ggplot() + geom_point(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima),size=1.5, color = "blue") +
+  geom_vline(xintercept = 1352258)
+
+
+ggplot() + geom_line(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima),size=1.5, color = "purple") +
+  geom_line(data=subset(wnaimii,Chr==Cgene_scaf),aes(x=WinCenter,y=Tajima),size=1.5, color = "purple") +
+  geom_vline(aes(xintercept= 1352258)) +
+  geom_line(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=tP),size=1.5, color = "red")  #+
+  geom_line(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=fuf),size=1.5, color = "green")  +
+  geom_line(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=fud),size=1.5, color = "purple") +
+  geom_line(data=subset(waida,Chr==Cgene_scaf),aes(x=WinCenter,y=zeng),size=1.5, color = "orange") 
+
+
+
+```
